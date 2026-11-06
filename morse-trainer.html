@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Morse practice</title>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+  :root {
+    --bg: #DCE3E9;
+    --ink: #162033;
+    --paper: #F7F8F3;
+    --blue: #2D46D6;
+    --blue-dark: #2236B0;
+    --green: #1B8A57;
+    --red: #CF3A2C;
+    --amber: #C48A10;
+    --muted: #556176;
+    --line: #BAC4CF;
+    --display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    font-family: var(--body);
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.5;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 18px calc(56px + env(safe-area-inset-bottom)); }
+
+  /* header + modes */
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px 24px; margin-bottom: 8px; }
+  h1 { font-family: var(--display); font-weight: 800; font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; }
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    border: 0; background: transparent; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+    font-weight: 700; color: var(--muted);
+  }
+  .tab:hover:not(:disabled) { color: var(--ink); background: rgba(22,32,51,.06); }
+  .tab[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .tab:disabled { opacity: .5; cursor: not-allowed; }
+  .lock-note { font-size: .85rem; color: var(--muted); margin: 0 0 4px; text-align: right; }
+
+  /* stage */
+  .stage { text-align: center; padding: 18px 0 8px; }
+  .glyph {
+    font-family: var(--display); font-weight: 800; line-height: .95;
+    font-size: clamp(7rem, 26vw, 12rem); letter-spacing: -0.03em;
+    transition: color .15s;
+  }
+  .stage.right .glyph { color: var(--green); }
+  .stage.wrong .glyph { color: var(--red); }
+
+  /* the paper tape */
+  .tape {
+    --u: clamp(10px, 3.2vw, 22px);
+    position: relative; height: 112px; margin: 6px auto 0; max-width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(circle at 11px 8px, var(--bg) 3px, transparent 3.6px) top left / 22px 16px repeat-x,
+      radial-gradient(circle at 11px 8px, var(--bg) 3px, transparent 3.6px) bottom left / 22px 16px repeat-x,
+      var(--paper);
+    border-radius: 3px;
+    box-shadow: 0 1px 0 rgba(22,32,51,.12);
+  }
+  .tape.right { box-shadow: 0 0 0 3px var(--green); }
+  .tape.wrong { box-shadow: 0 0 0 3px var(--red); animation: nudge .28s; }
+  .marks { display: inline-flex; align-items: center; gap: calc(var(--u) * .75); min-height: var(--u); }
+  .dot, .dash { display: inline-block; height: var(--u); background: var(--ink); }
+  .dot { width: var(--u); border-radius: 50%; }
+  .dash { width: calc(var(--u) * 3); border-radius: var(--u); }
+  .tape.right .dot, .tape.right .dash { background: var(--green); }
+  .tape.wrong .dot, .tape.wrong .dash { background: var(--red); }
+  .pop { animation: pop .12s ease-out; }
+  .caret { display: inline-block; width: 3px; height: calc(var(--u) * 1.8); background: var(--blue); margin-left: calc(var(--u) * .5); animation: blink 1s steps(2, start) infinite; }
+  @keyframes blink { to { visibility: hidden; } }
+  @keyframes pop { from { transform: scale(.4); } to { transform: scale(1); } }
+  @keyframes nudge { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+  .reveal { margin: 14px 0 0; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; min-height: 28px; }
+  .reveal .marks { --u: 11px; }
+  .reveal .dot, .reveal .dash { background: var(--ink); }
+  .note { margin: 14px auto 0; min-height: 28px; color: var(--muted); max-width: 46ch; }
+
+  /* controls */
+  .keys { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px auto 0; max-width: 460px; }
+  .keybtn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 16px 10px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper);
+    cursor: pointer; font-weight: 700; font-size: 1.05rem;
+  }
+  .keybtn:active:not(:disabled) { background: var(--ink); color: var(--paper); }
+  .keybtn:active:not(:disabled) .dot, .keybtn:active:not(:disabled) .dash { background: var(--paper); }
+  .keybtn .dot, .keybtn .dash { --u: 10px; }
+  .keybtn:disabled { opacity: .45; cursor: default; }
+  kbd {
+    font-family: var(--body); font-weight: 700; font-size: .85rem; min-width: 1.8em; text-align: center;
+    padding: 1px 7px; border: 1.5px solid currentColor; border-radius: 5px; opacity: .8;
+  }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 12px; }
+  .btn {
+    padding: 10px 18px; border-radius: 8px; border: 2px solid var(--ink); background: transparent;
+    cursor: pointer; font-weight: 700;
+  }
+  .btn:hover:not(:disabled) { background: rgba(22,32,51,.07); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; min-width: 120px; }
+  .btn.primary:hover:not(:disabled) { background: var(--blue-dark); border-color: var(--blue-dark); }
+  .btn.danger { border-color: var(--red); color: var(--red); }
+  .btn.danger.armed { background: var(--red); color: #fff; }
+  .hint { margin: 14px 0 0; color: var(--muted); font-size: .92rem; }
+  button:focus-visible, summary:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+  .empty { padding: 36px 0 12px; }
+  .empty h2 { font-family: var(--display); font-size: 1.6rem; margin: 0 0 6px; }
+  .empty p { margin: 0 auto 18px; max-width: 42ch; color: var(--muted); }
+
+  /* level / mode panel */
+  section.panel { margin-top: 30px; padding-top: 22px; border-top: 2px solid var(--line); }
+  h2.sec { font-family: var(--display); font-size: 1.15rem; margin: 0 0 4px; }
+  .sub { margin: 0 0 12px; color: var(--muted); }
+  .pool { font-family: var(--display); font-weight: 700; font-size: 1.3rem; letter-spacing: .12em; word-break: break-all; }
+  .pool b { color: var(--blue); }
+  .pips { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; margin: 12px 0 8px; max-width: 420px; }
+  .pip { height: 14px; border-radius: 3px; background: transparent; border: 1.5px solid var(--line); }
+  .pip.ok { background: var(--green); border-color: var(--green); }
+  .pip.miss { background: var(--red); border-color: var(--red); }
+  .pip.goal { border-color: var(--ink); }
+
+  /* progress grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 8px; margin-top: 12px; }
+  .tile {
+    position: relative; overflow: hidden; background: var(--paper); border-radius: 6px; padding: 8px 6px 12px;
+    text-align: center; border: 2px solid transparent;
+  }
+  .tile .c { font-family: var(--display); font-weight: 800; font-size: 1.5rem; line-height: 1.1; }
+  .tile .p { height: 12px; display: flex; justify-content: center; align-items: center; margin-top: 2px; }
+  .tile .marks { --u: 5px; gap: 3px; }
+  .tile .pct { font-size: .78rem; color: var(--muted); }
+  .tile .bar { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--green); }
+  .tile.locked { background: transparent; border: 2px dashed var(--line); color: var(--muted); }
+  .tile.locked .c { opacity: .55; }
+  .tile.newest { border-color: var(--blue); }
+  .tile.mid .bar { background: var(--amber); }
+  .tile.low .bar { background: var(--red); }
+  .totals { margin: 14px 0 0; color: var(--muted); }
+
+  /* settings */
+  details { margin-top: 30px; padding-top: 18px; border-top: 2px solid var(--line); }
+  summary { cursor: pointer; font-family: var(--display); font-weight: 700; font-size: 1.15rem; }
+  .settings { display: grid; gap: 14px; margin-top: 16px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+  .row .label { min-width: 150px; font-weight: 700; }
+  .row .help { color: var(--muted); font-size: .9rem; flex-basis: 100%; margin: -6px 0 0; }
+  .keycap { min-width: 92px; }
+  label.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--blue); }
+
+  [hidden] { display: none !important; }
+  .wk { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 6px 0; }
+  .wkname { min-width: 92px; font-weight: 700; }
+  .tile .pct.sm { font-size: .64rem; line-height: 1.2; }
+  .grid.wide { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  .glyph.ph { opacity: .3; }
+  .pad { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; margin: 16px auto 0; max-width: 520px; }
+  .padkey {
+    height: 46px; border: 2px solid var(--ink); border-radius: 8px; background: var(--paper); cursor: pointer;
+    font-family: var(--display); font-weight: 800; font-size: 1.15rem; padding: 0;
+  }
+  .padkey:active:not(:disabled) { background: var(--ink); color: var(--paper); }
+  .padkey:disabled { opacity: .4; cursor: default; }
+  .heard { font-family: var(--display); font-weight: 800; font-size: 3.2rem; line-height: 1; min-width: 1ch; }
+  .tape.right .heard { color: var(--green); }
+  .tape.wrong .heard { color: var(--red); }
+  .tabs { flex-wrap: wrap; }
+
+  /* copy practice */
+  .stage.copy { text-align: left; padding-top: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 8px; }
+  .chip {
+    min-width: 42px; padding: 6px 8px; border: 2px solid var(--line); border-radius: 6px; background: transparent;
+    font-family: var(--display); font-weight: 800; font-size: 1.05rem; cursor: pointer; color: var(--muted);
+  }
+  .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .minis { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .btn.small { padding: 5px 12px; font-size: .9rem; }
+  .crow { display: grid; grid-template-columns: minmax(150px, 210px) 1fr 84px; align-items: center; gap: 12px; margin: 14px 0; }
+  .crow .lab { font-weight: 700; }
+  .crow output { font-weight: 700; text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--blue); }
+  .seg { display: flex; gap: 4px; flex-wrap: wrap; }
+  .segbtn { padding: 7px 14px; border: 2px solid var(--ink); border-radius: 6px; background: transparent; font-weight: 700; cursor: pointer; }
+  .segbtn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .est { color: var(--muted); margin: 14px 0 18px; }
+  .runbar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .runfill { height: 100%; width: 0; background: var(--blue); }
+  .runinfo { margin: 10px 0 12px; font-weight: 700; min-height: 1.5em; }
+  .sheet { background: var(--paper); border-radius: 3px; padding: 18px 22px; min-height: 120px; max-height: 210px; overflow-y: auto; box-shadow: 0 1px 0 rgba(22,32,51,.12); }
+  .typed { font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 6vw, 2.4rem); letter-spacing: .12em; line-height: 1.5; word-break: break-all; }
+  .typed .g { display: inline-block; margin-right: .8em; }
+  .typed .caret { --u: .55em; margin-left: .1em; vertical-align: middle; }
+  .rsum { font-size: 1.15rem; margin: 6px 0 4px; }
+  .rgrid { display: flex; flex-wrap: wrap; gap: 12px 16px; margin: 14px 0 6px; }
+  .rblock { display: flex; gap: 4px; background: var(--paper); padding: 6px 10px; border-radius: 5px; }
+  .cell { display: flex; flex-direction: column; align-items: center; min-width: 1.5em; font-family: var(--display); font-weight: 800; font-size: 1.15rem; line-height: 1.35; }
+  .cell i { font-style: normal; border-top: 2px solid var(--line); width: 100%; text-align: center; }
+  .cell.ok i { color: var(--green); }
+  .cell.bad i { color: var(--red); }
+  .cell.extra b, .cell.extra i { color: var(--amber); }
+  @media (max-width: 560px) {
+    .crow { grid-template-columns: 1fr 84px; }
+    .crow .lab { grid-column: 1 / -1; }
+  }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<noscript><p style="padding:16px;background:#CF3A2C;color:#fff;margin:0">JavaScript is turned off or blocked, so this page cannot run. Open the file in a desktop browser such as Chrome, Firefox, Edge or Safari.</p></noscript>
+<div class="wrap">
+  <header>
+    <h1>Morse practice</h1>
+    <nav class="tabs" id="tabs" aria-label="Practice mode"></nav>
+  </header>
+  <p class="lock-note" id="lockNote"></p>
+
+  <main>
+    <div class="stage" id="stage"></div>
+    <section class="panel" id="level" aria-label="Level"></section>
+    <section class="panel" id="progress" aria-label="Progress"></section>
+  </main>
+
+  <details id="settingsBox">
+    <summary>Settings</summary>
+    <div class="settings" id="settings"></div>
+  </details>
+
+  <div class="sr" id="live" aria-live="polite"></div>
+</div>
+
+<script>
+window.addEventListener('error', function (e) {
+  var b = document.createElement('p');
+  b.style.cssText = 'padding:12px 16px;background:#CF3A2C;color:#fff;margin:0;font:14px sans-serif';
+  b.textContent = 'Something went wrong: ' + e.message + (e.lineno ? ' (line ' + e.lineno + ')' : '') + '. Please send this message back.';
+  document.body.insertBefore(b, document.body.firstChild);
+});
+/* ---------- data ---------- */
+const MORSE = {
+  A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',
+  K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',
+  U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',
+  '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-',
+  '5':'.....','6':'-....','7':'--...','8':'---..','9':'----.'
+};
+// Koch order (letters only), then the digits in Koch order
+const LETTER_ORDER = 'KMRSUAPTLOWINJEFYVGQZHBCDX'.split('');
+const NUMBER_ORDER = '0593842716'.split('');
+const WINDOW = 20;       // attempts considered for unlocking
+const NEEDED = 18;       // 18 of 20 = 90%
+const MAX_SYMBOLS = 7;
+const KEY = 'morse-trainer-v1';
+
+/* ---------- storage (works as an artifact, or saved to a normal page) ---------- */
+const store = {
+  async get(k) {
+    if (window.storage) {
+      try { const r = await window.storage.get(k); return r ? r.value : null; } catch (e) { return null; }
+    }
+    try { return window['local' + 'Storage'].getItem(k); } catch (e) { return null; }
+  },
+  async set(k, v) {
+    if (window.storage) { try { await window.storage.set(k, v); } catch (e) {} return; }
+    try { window['local' + 'Storage'].setItem(k, v); } catch (e) {}
+  },
+  async del(k) {
+    if (window.storage) { try { await window.storage.delete(k); } catch (e) {} return; }
+    try { window['local' + 'Storage'].removeItem(k); } catch (e) {}
+  }
+};
+
+/* ---------- state ---------- */
+const defaults = () => ({
+  unlocked: 2,
+  introduced: [],
+  stats: {},
+  window: [],
+  lettersDone: false,
+  totals: { attempts: 0, correct: 0 },
+  copy: { size: 5, minutes: 1, charWpm: 20, effWpm: 12, paced: false, off: [] },
+  L: { unlocked: 2, introduced: [], stats: {}, window: [], lettersDone: false },   // the listening track
+  R: { unlocked: 2, introduced: [], stats: {}, window: [], lettersDone: false },   // the reading track
+  settings: { dot: 'j', dash: 'k', enter: 'Enter', replay: 'Space', skill: 'both', keypad: null, readSound: true, listenWpm: 15, sound: true, numbers: false }
+});
+let S = defaults();
+let mode = 'learn';          // learn | weak | free
+let phase = 'input';         // input | right | wrong | intro | empty
+let cur = null, last = null, typed = '', lastAction = '';
+let kind = 'type', lastKind = 'type';
+const SKILLS = ['type', 'listen', 'read'];   // type the morse | hear it | see it
+const KIND_OF_MODE = { learn: 'type', listen: 'listen', read: 'read' };
+const isLearnMode = () => Object.prototype.hasOwnProperty.call(KIND_OF_MODE, mode);
+const isRecv = () => kind === 'listen' || kind === 'read';   // rounds where you type a letter   // what the current round is: typing the morse, or listening
+let rebindNote = '';
+let rebinding = null, resetArmed = false, timer = null, resetTimer = null;
+
+const seq = () => LETTER_ORDER.concat(S.settings.numbers ? NUMBER_ORDER : []);
+// Typing (sending) and listening each have their own progress. sk() is the one in use.
+const sk = () => mode === 'read' ? S.R : (mode === 'listen' || mode === 'copy') ? S.L : S;
+const pool = () => seq().slice(0, Math.min(sk().unlocked, seq().length));
+const copyPool = () => seq().slice(0, Math.min(Math.max(S.unlocked, S.L.unlocked, S.R.unlocked), seq().length));
+const copyUnlocked = () => S.lettersDone || S.L.lettersDone || S.R.lettersDone;
+const sum = a => a.reduce((x, y) => x + y, 0);
+const missRate = c => { const s = sk().stats[c]; return s && s.r.length ? 1 - sum(s.r) / s.r.length : 0; };
+const skillObj = k => k === 'listen' ? S.L : k === 'read' ? S.R : S;
+const poolFor = k => seq().slice(0, Math.min(skillObj(k).unlocked, seq().length));
+const missFor = (k, c) => { const s = skillObj(k).stats[c]; return s && s.r.length ? 1 - sum(s.r) / s.r.length : 0; };
+// Which skills Weak letters / Free practice draw from
+function activeSkills() {
+  let ks = SKILLS.slice();
+  const pick = S.settings.skill;
+  if (SKILLS.includes(pick)) ks = [pick];
+  return ks;
+}
+const keyLabel = k => k === ' ' ? 'Space' : k.toUpperCase();
+const CODE_NAMES = { Enter: 'Enter', NumpadEnter: 'Numpad Enter', Space: 'Space', ShiftLeft: 'Left Shift', ShiftRight: 'Right Shift' };
+const codeLabel = c => CODE_NAMES[c] || c.replace(/^Key|^Digit/, '').replace(/([a-z])([A-Z])/g, '$1 $2');
+const EK = () => codeLabel(S.settings.enter);
+const RK = () => codeLabel(S.settings.replay);
+const kbFocus = t => { try { return !!(t && t.matches && t.matches('button:focus-visible')); } catch (e) { return false; } };
+const coarsePointer = () => { try { return window.matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } };
+const padOn = () => (S.settings.keypad === null || S.settings.keypad === undefined) ? coarsePointer() : !!S.settings.keypad;
+const padHTML = off => '<div class="pad" role="group" aria-label="Keypad">' +
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').concat(S.settings.numbers ? NUMBER_ORDER.slice().sort() : []).map(ch =>
+    `<button class="padkey" data-action="pad" data-ch="${ch}" ${off ? 'disabled' : ''}>${ch}</button>`).join('') + '</div>';
+const isEnterKey = e => e.code === S.settings.enter || (S.settings.enter === 'Enter' && e.code === 'NumpadEnter');
+const words = p => p.split('').map(s => s === '.' ? 'dot' : 'dash').join(' ');
+const marks = (p, extraLast) => '<span class="marks">' + p.split('').map((s, i) =>
+  `<span class="${s === '.' ? 'dot' : 'dash'}${extraLast && i === p.length - 1 ? ' pop' : ''}"></span>`).join('') + '</span>';
+
+function save() { store.set(KEY, JSON.stringify(S)); }
+
+async function load() {
+  const raw = await store.get(KEY);
+  if (!raw) return;
+  try {
+    const d = JSON.parse(raw), base = defaults();
+    // Merge saved data over the defaults, so settings added in newer versions get their default values.
+    S = Object.assign({}, base, d);
+    S.settings = Object.assign({}, base.settings, d.settings);
+    S.totals = Object.assign({}, base.totals, d.totals);
+    S.copy = Object.assign({}, base.copy, d.copy);
+    if (!Array.isArray(S.copy.off)) S.copy.off = [];
+    S.L = Object.assign({}, base.L, d.L);
+    S.R = Object.assign({}, base.R, d.R);
+    if (!(S.settings.listenWpm >= 10 && S.settings.listenWpm <= 40)) S.settings.listenWpm = base.settings.listenWpm;
+    if (typeof S.settings.enter !== 'string') S.settings.enter = base.settings.enter;
+    if (typeof S.settings.replay !== 'string') S.settings.replay = base.settings.replay;
+    if (!['both', 'type', 'listen', 'read'].includes(S.settings.skill)) S.settings.skill = 'both';
+  } catch (e) { S = defaults(); }
+}
+
+/* ---------- audio ---------- */
+let ac = null;
+function ctx() {
+  if (!ac) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; ac = new C(); }
+  if (ac.state !== 'running') { try { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+  return ac;
+}
+// iOS only allows sound after a tap. Start the audio engine on the first touch or key press,
+// and ask Safari to play even when the ringer switch is on silent.
+let audioReady = false;
+function unlockAudio() {
+  if (audioReady) return;
+  const c = ctx(); if (!c) return;
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  try { const src = c.createBufferSource(); src.buffer = c.createBuffer(1, 1, 22050); src.connect(c.destination); src.start(0); } catch (e) {}
+  if (c.state === 'running') audioReady = true;
+}
+['touchstart', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+function beepAbs(t, ms, dest) {
+  if (!isFinite(t) || !isFinite(ms) || ms <= 0) return;
+  const c = ac, d = ms / 1000;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = 'sine'; o.frequency.value = 620;
+  const ramp = Math.min(0.008, d / 3);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.25, t + ramp);
+  g.gain.setValueAtTime(0.25, t + d - ramp);
+  g.gain.linearRampToValueAtTime(0, t + d);
+  o.connect(g); g.connect(dest);
+  o.start(t); o.stop(t + d + 0.02);
+}
+function toneAt(offset, ms) {
+  const c = ctx(); if (!c) return;
+  beepAbs(c.currentTime + offset, ms, c.destination);
+}
+function keyBeep(sym) { if (S.settings.sound) toneAt(0, sym === '.' ? 70 : 210); }
+function playPattern(p) {   // plays even if key beeps are muted
+  const unit = 1200 / (Number(S.settings.listenWpm) || 15); let t = 0.05;
+  p.split('').forEach(s => {
+    const len = s === '.' ? unit : unit * 3;
+    toneAt(t, len);
+    t += (len + unit) / 1000;
+  });
+}
+
+/* ---------- practice flow ---------- */
+function weightedPick(list, wf) {
+  const ws = list.map(wf), total = sum(ws);
+  let r = Math.random() * total;
+  for (let i = 0; i < list.length; i++) { r -= ws[i]; if (r <= 0) return list[i]; }
+  return list[list.length - 1];
+}
+// Every {skill, character} pair that can come up in the current mode
+function roundItems() {
+  if (mode === 'learn') return poolFor('type').map(c => ({ k: 'type', c }));
+  if (mode === 'listen') return poolFor('listen').map(c => ({ k: 'listen', c }));
+  if (mode === 'read') return poolFor('read').map(c => ({ k: 'read', c }));
+  const items = [];
+  activeSkills().forEach(k => (mode === 'free' ? copyPool() : poolFor(k)).forEach(c => {
+    if (mode === 'free' || missFor(k, c) > 0) items.push({ k, c });
+  }));
+  return items;
+}
+function pickNext() {
+  let items = roundItems();
+  if (items.length > 1) items = items.filter(i => !(i.c === last && i.k === lastKind));
+  if (mode === 'weak') return weightedPick(items, i => missFor(i.k, i.c) + 0.1);
+  return weightedPick(items, i => {
+    const all = poolFor(i.k), newest = all[all.length - 1];
+    let w = 1 + 3 * missFor(i.k, i.c);
+    if (isLearnMode() && all.length > 2 && i.c === newest) w *= 2.5;   // lean on the newest character
+    return w;
+  });
+}
+function nextRound() {
+  clearTimeout(timer);
+  if (mode === 'copy') { renderAll(); return; }
+  typed = ''; lastAction = '';
+  if (isLearnMode()) {
+    kind = KIND_OF_MODE[mode];
+    const fresh = poolFor(kind).find(c => !skillObj(kind).introduced.includes(c));
+    if (fresh) { cur = fresh; phase = 'intro'; renderAll(); playPattern(MORSE[cur]); return; }
+  }
+  if (!roundItems().length) { cur = null; phase = 'empty'; renderAll(); return; }
+  const it = pickNext();
+  cur = it.c; kind = it.k; last = cur; lastKind = kind; phase = 'input';
+  renderAll();
+  if (kind === 'listen' || (kind === 'read' && S.settings.readSound)) playPattern(MORSE[cur]);
+}
+function bump(c, ok, k) {
+  const o = k ? skillObj(k) : sk();
+  const st = o.stats[c] || (o.stats[c] = { a: 0, c: 0, r: [] });
+  st.a++; if (ok) st.c++;
+  st.r.push(ok ? 1 : 0); if (st.r.length > WINDOW) st.r.shift();
+  S.totals.attempts++; if (ok) S.totals.correct++;
+}
+function record(c, ok) {
+  bump(c, ok, kind);
+  if (isLearnMode()) {
+    const k = sk();
+    k.window.push(ok ? 1 : 0); if (k.window.length > WINDOW) k.window.shift();
+    if (k.window.length >= WINDOW && sum(k.window) >= NEEDED) {
+      if (k.unlocked >= LETTER_ORDER.length) k.lettersDone = true;
+      if (k.unlocked < seq().length) { k.unlocked++; k.window = []; }
+    }
+  }
+  save();
+}
+function submit() {
+  if (phase === 'intro') { sk().introduced.push(cur); save(); nextRound(); return; }
+  if (phase === 'wrong') { nextRound(); return; }
+  if (phase !== 'input' || !typed) return;
+  const ok = isRecv() ? typed === cur : typed === MORSE[cur];
+  record(cur, ok);
+  if (ok) {
+    phase = 'right';
+    document.getElementById('live').textContent = 'Correct';
+    renderAll();
+    timer = setTimeout(nextRound, 380);
+  } else {
+    phase = 'wrong';
+    document.getElementById('live').textContent = 'Incorrect. ' + cur + ' is ' + words(MORSE[cur]);
+    renderAll();
+    playPattern(MORSE[cur]);
+  }
+}
+function addSymbol(s) {
+  if (phase !== 'input' || typed.length >= MAX_SYMBOLS) return;
+  typed += s; lastAction = 'add'; keyBeep(s); renderStage();
+}
+function del() {
+  if (phase !== 'input' || !typed) return;
+  typed = typed.slice(0, -1); lastAction = 'del'; renderStage();
+}
+function setMode(m) {
+  if (m === 'free' && !copyUnlocked()) return;
+  if (m === 'copy' && !copyUnlocked()) return;
+  stopCopy();
+  mode = m; last = null;
+  if (m === 'copy') { copyView = 'setup'; copyResult = null; renderAll(); }
+  else nextRound();
+}
+
+/* ---------- rendering ---------- */
+function renderAll() { renderTabs(); renderStage(); renderLevel(); renderProgress(); }
+
+function renderTabs() {
+  const tab = (m, label, dis, title) =>
+    `<button class="tab" data-action="mode" data-mode="${m}" aria-pressed="${mode === m}" ${dis ? 'disabled' : ''} ${title ? `title="${title}"` : ''}>${label}</button>`;
+  document.getElementById('tabs').innerHTML =
+    tab('learn', 'Type', false, 'See a letter and type its morse') +
+    tab('listen', 'Listen', false, 'Hear a letter in morse and type the letter') +
+    tab('read', 'Read', false, 'See the morse and type the letter') +
+    tab('weak', 'Weak letters', false) +
+    tab('free', 'Free practice', !copyUnlocked(), 'Unlocks when every letter is learned in Type, Listen or Read') +
+    tab('copy', 'Copy practice', !copyUnlocked(), 'Unlocks when every letter is learned in Type, Listen or Read');
+  document.getElementById('lockNote').textContent = copyUnlocked() ? ''
+    : 'Free practice and Copy practice unlock once you have learned every letter, in Type, Listen or Read.';
+}
+
+function renderStage() {
+  const el = document.getElementById('stage');
+  if (mode === 'copy') { renderCopy(el); return; }
+  if (isRecv() && phase !== 'empty') { listenStage(el); return; }
+  const dk = keyLabel(S.settings.dot), hk = keyLabel(S.settings.dash);
+  if (phase === 'empty') {
+    el.className = 'stage';
+    el.innerHTML = `<div class="empty"><h2>No weak letters yet</h2>
+      <p>Characters you get wrong will collect here. Keep practicing in Type, Listen or Read, then come back.</p>
+      <button class="btn primary" data-action="mode" data-mode="learn">Back to Type</button></div>`;
+    return;
+  }
+  const intro = phase === 'intro';
+  const shown = intro ? MORSE[cur] : typed;
+  el.className = 'stage' + (phase === 'right' ? ' right' : phase === 'wrong' ? ' wrong' : '');
+  const tapeCls = 'tape' + (phase === 'right' ? ' right' : phase === 'wrong' ? ' wrong' : '');
+  const caret = phase === 'input' ? '<span class="caret"></span>' : '';
+  let under = '';
+  if (phase === 'wrong') {
+    under = `<div class="reveal"><span>It was ${cur}:</span>${marks(MORSE[cur])}<span>${words(MORSE[cur])}</span></div>`;
+  } else if (intro) {
+    under = `<p class="note"><strong>New character.</strong> It is ${words(MORSE[cur])}. Play it a few times, then press ${EK()}.</p>`;
+  } else {
+    under = '<div class="reveal"></div>';
+  }
+  const off = phase !== 'input' ? 'disabled' : '';
+  const enterLabel = intro ? 'Got it' : phase === 'wrong' ? 'Next letter' : 'Check';
+  el.innerHTML = `
+    <div class="glyph" aria-label="Type the morse for ${cur}">${cur}</div>
+    <div class="${tapeCls}">${marks(shown, !intro && lastAction === 'add')}${caret}</div>
+    ${under}
+    <div class="keys">
+      <button class="keybtn" data-action="dot" ${off}><span class="dot"></span>Dot <kbd>${dk}</kbd></button>
+      <button class="keybtn" data-action="dash" ${off}><span class="dash"></span>Dash <kbd>${hk}</kbd></button>
+    </div>
+    <div class="actions">
+      <button class="btn" data-action="del" ${off}>Delete</button>
+      <button class="btn" data-action="play">Play answer</button>
+      <button class="btn primary" data-action="enter" ${phase === 'right' ? 'disabled' : ''}>${enterLabel}</button>
+    </div>
+    <p class="hint">${dk} is a dot, ${hk} is a dash. Backspace deletes. ${EK()} checks your answer.</p>`;
+}
+
+function renderLevel() {
+  const el = document.getElementById('level');
+  el.hidden = mode === 'copy';
+  if (mode === 'copy') return;
+  if (mode === 'weak' || mode === 'free') {
+    const ks = activeSkills(), names = { type: 'Typing', listen: 'Listening', read: 'Reading' };
+    const rows = ks.map(k => {
+      const list = mode === 'weak'
+        ? poolFor(k).filter(c => missFor(k, c) > 0).sort((a, b) => missFor(k, b) - missFor(k, a)).slice(0, 8)
+        : copyPool();
+      return `<div class="wk"><span class="wkname">${names[k]}</span><span class="pool">${list.length ? list.join(' ') : 'none right now'}</span></div>`;
+    }).join('');
+    const canChoose = true;
+    const cur2 = S.settings.skill;
+    const seg = canChoose ? '<div class="seg" style="margin:10px 0 4px">' + [['both', 'All'], ['type', 'Type'], ['listen', 'Listen'], ['read', 'Read']].map(([v, l]) =>
+      `<button class="segbtn" data-action="skill" data-v="${v}" aria-pressed="${cur2 === v}">${l}</button>`).join('') + '</div>' : '';
+    el.innerHTML = mode === 'weak'
+      ? `<h2 class="sec">Weak letters</h2>
+         <p class="sub">The characters you have missed most in your last 20 tries, from typing, listening and reading.</p>${rows}${seg}`
+      : `<h2 class="sec">Free practice</h2>
+         <p class="sub">Every character you have unlocked, picked at random. Jump between typing, listening and reading, or mix them all. Your progress grid still updates.</p>${rows}${seg}`;
+    return;
+  }
+  const p = pool(), total = seq().length, newest = p[p.length - 1];
+  const k = sk(), w = k.window;
+  const pips = Array.from({ length: WINDOW }, (_, i) =>
+    `<span class="pip ${i < w.length ? (w[i] ? 'ok' : 'miss') : ''}"></span>`).join('');
+  const poolHtml = p.map(c => c === newest && p.length < total ? `<b>${c}</b>` : c).join(' ');
+  let msg;
+  if (k.unlocked < total) {
+    msg = `Get ${NEEDED} of your next ${WINDOW} attempts right (90%) to unlock another character. You are at ${sum(w)} of ${w.length} so far.`;
+  } else if (k.lettersDone) {
+    msg = 'Every character is unlocked. Keep drilling here, or try Free practice or Copy practice.';
+  } else {
+    msg = `Last character unlocked. Get ${NEEDED} of ${WINDOW} right to finish. You are at ${sum(w)} of ${w.length} so far.`;
+  }
+  el.innerHTML = `<h2 class="sec">${{ listen: 'Listening to', read: 'Reading' }[mode] || 'Typing'} ${p.length} of ${total} characters</h2>
+    <div class="pool">${poolHtml}</div>
+    <div class="pips" aria-hidden="true">${pips}</div>
+    <p class="sub">${msg}${k.lettersDone && k.unlocked < total ? ' All letters done. Numbers are next.' : ''}</p>`;
+}
+
+function renderProgress() {
+  const el = document.getElementById('progress');
+  const both = mode === 'weak' || mode === 'free';
+  const k0 = mode === 'read' ? 'read' : (mode === 'listen' || mode === 'copy') ? 'listen' : 'type';
+  const p = mode === 'copy' ? copyPool() : pool(), newest = p[p.length - 1];
+  const pT = mode === 'free' ? copyPool() : poolFor('type'), pL = mode === 'free' ? copyPool() : poolFor('listen'), pR = mode === 'free' ? copyPool() : poolFor('read');
+  const pctOf = (k, c) => { const st = skillObj(k).stats[c]; return st && st.r.length ? Math.round(sum(st.r) / st.r.length * 100) : null; };
+  const doneNow = both ? copyUnlocked() : sk().lettersDone;
+  const tiles = LETTER_ORDER.concat(NUMBER_ORDER).map(c => {
+    const unlocked = both ? (pT.includes(c) || pL.includes(c) || pR.includes(c)) : p.includes(c);
+    if (!unlocked) {
+      const off = NUMBER_ORDER.includes(c) && !S.settings.numbers;
+      const title = !NUMBER_ORDER.includes(c) ? 'Locked'
+        : !doneNow ? 'Numbers unlock after all 26 letters are learned'
+        : off ? 'Turn on numbers in Settings to start learning them' : 'Locked';
+      return `<div class="tile locked" title="${title}"><div class="c">${c}</div><div class="p"></div><div class="pct">${off && doneNow ? 'off' : 'locked'}</div></div>`;
+    }
+    let label, bar, title;
+    if (both) {
+      const a = pT.includes(c) ? pctOf('type', c) : null, b = pL.includes(c) ? pctOf('listen', c) : null, r = pR.includes(c) ? pctOf('read', c) : null;
+      const parts = []; if (a !== null) parts.push('T' + a); if (b !== null) parts.push('L' + b); if (r !== null) parts.push('R' + r);
+      label = parts.length ? parts.join(' ') : 'new';
+      const vals = [a, b, r].filter(v => v !== null);
+      bar = vals.length ? Math.min(...vals) : null;
+      title = `${c}: ${MORSE[c]}${a !== null ? ` | typing ${a}%` : ''}${b !== null ? ` | listening ${b}%` : ''}${r !== null ? ` | reading ${r}%` : ''}`;
+    } else {
+      const st = skillObj(k0).stats[c];
+      bar = pctOf(k0, c);
+      label = bar === null ? 'new' : bar + '%';
+      title = `${c}: ${MORSE[c]}${st ? ` | ${st.c} of ${st.a} correct overall` : ''}`;
+    }
+    const cls = bar === null ? '' : bar >= 90 ? '' : bar >= 70 ? ' mid' : ' low';
+    const isNew = isLearnMode() && c === newest && p.length < seq().length ? ' newest' : '';
+    return `<div class="tile${cls}${isNew}" title="${title}">
+      <div class="c">${c}</div><div class="p">${marks(MORSE[c])}</div>
+      <div class="pct${both ? ' sm' : ''}">${label}</div>
+      ${bar === null ? '' : `<div class="bar" style="width:${bar}%"></div>`}</div>`;
+  }).join('');
+  const t = S.totals, acc = t.attempts ? Math.round(t.correct / t.attempts * 100) : 0;
+  const what = both ? ': T for typing, L for listening, R for reading' : mode === 'read' ? ' when reading' : (mode === 'listen' || mode === 'copy' ? ' by ear' : ' when typing');
+  el.innerHTML = `<h2 class="sec">Your progress</h2>
+    <p class="sub">Each tile shows accuracy over that character's last 20 attempts${what}.</p>
+    <div class="grid${both ? ' wide' : ''}">${tiles}</div>
+    <p class="totals">${t.attempts} attempts so far, ${acc}% correct.</p>`;
+}
+
+function renderSettings() {
+  const s = S.settings;
+  const cap = (which, label) => `<div class="row"><span class="label">${label}</span>
+    <button class="btn keycap" data-action="rebind" data-which="${which}">${rebinding === which ? 'Press a key...' : keyLabel(s[which])}</button></div>`;
+  document.getElementById('settings').innerHTML = `
+    ${cap('dot', 'Dot key')}
+    ${cap('dash', 'Dash key')}
+    <div class="row"><span class="label">Enter key</span>
+      <button class="btn keycap" data-action="rebind" data-which="enter">${rebinding === 'enter' ? 'Press a key...' : EK()}</button>
+      <p class="help">${rebinding === 'enter' && rebindNote ? rebindNote : 'Checks your answer and moves on. Choose a key that is not a letter or number. Press Esc to cancel, or press Enter to go back to the default.'}</p></div>
+    <div class="row"><span class="label">Replay key</span>
+      <button class="btn keycap" data-action="rebind" data-which="replay">${rebinding === 'replay' ? 'Press a key...' : RK()}</button>
+      <p class="help">${rebinding === 'replay' && rebindNote ? rebindNote : s.replay === s.enter ? 'This is the same key as Enter, so it will not replay. Pick another key.' : 'Plays the sound again in Listen and Read modes, and replays a block in Copy practice when it waits for you. Choose a key that is not a letter or number.'}</p></div>
+    <div class="row"><span class="label">Listening speed</span>
+      <input id="sp-listen" type="range" min="10" max="40" step="1" value="${s.listenWpm}" data-speed="listenWpm" style="max-width:220px">
+      <output id="sv-listen">${s.listenWpm} wpm</output>
+      <p class="help">How fast each letter sounds in Listen and Read modes, new-letter intros and Play answer.</p></div>
+    <div class="row"><span class="label">Keypad</span>
+      <label class="check"><input type="checkbox" data-setting="keypad" ${padOn() ? 'checked' : ''}> Show an on-screen keypad in Listen, Read and Copy practice</label>
+      <p class="help">Useful on a phone or tablet. It is on by default for touch screens.</p></div>
+    <div class="row"><span class="label">Read mode</span>
+      <label class="check"><input type="checkbox" data-setting="readSound" ${s.readSound ? 'checked' : ''}> Play the sound as well as showing the morse</label>
+      <p class="help">Turn this off to read the pattern in silence. Play again still works.</p></div>
+    <div class="row"><span class="label">Sound</span>
+      <label class="check"><input type="checkbox" data-setting="sound" ${s.sound ? 'checked' : ''}> Beep when I press a key</label></div>
+    <div class="row"><span class="label">Numbers</span>
+      <label class="check"><input type="checkbox" data-setting="numbers" ${s.numbers ? 'checked' : ''}> Add numbers after the letters</label>
+      <p class="help">Digits unlock one at a time once all 26 letters are learned.</p></div>
+    <div class="row"><span class="label">Progress</span>
+      <button class="btn danger ${resetArmed ? 'armed' : ''}" data-action="reset">${resetArmed ? 'Click again to erase everything' : 'Reset progress'}</button></div>`;
+}
+
+/* ---------- input ---------- */
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if (rebinding) {
+    e.preventDefault();
+    if (k === 'Escape') { rebinding = null; rebindNote = ''; renderSettings(); return; }
+    if (rebinding === 'enter' || rebinding === 'replay') {
+      const c = e.code, lk = k.toLowerCase(), other = rebinding === 'enter' ? 'replay' : 'enter';
+      const bad = /^(Key|Digit|Control|Alt|Meta|OS|Numpad\d)/.test(c) || ['Backspace', 'Tab', 'CapsLock'].includes(c)
+        || lk === S.settings.dot || lk === S.settings.dash;
+      if (bad) {
+        rebindNote = 'That key is already used for typing. Pick another, such as Space, Enter or a Shift key.';
+        renderSettings(); return;
+      }
+      if (c === S.settings[other]) {
+        if (rebinding === 'replay') {
+          rebindNote = 'That key is the Enter key. Pick another, or change the Enter key first.';
+          renderSettings(); return;
+        }
+        S.settings.replay = S.settings.enter;   // swap, so the two never share a key
+      }
+      S.settings[rebinding] = c; save();
+    } else {
+      if (k.length !== 1) return;
+      const other = rebinding === 'dot' ? 'dash' : 'dot';
+      const nk = k.toLowerCase();
+      if (nk !== S.settings[other] && e.code !== S.settings.enter) { S.settings[rebinding] = nk; save(); }
+    }
+    rebinding = null; rebindNote = ''; renderSettings(); renderStage();
+    return;
+  }
+  const t = e.target;
+  if (t && t.tagName === 'INPUT') return;
+  if (mode === 'copy') { copyKey(e); return; }
+  if (isRecv() && phase !== 'empty') { listenKey(e); return; }
+  if (isEnterKey(e)) {
+    if (kbFocus(t) && (e.code === 'Enter' || e.code === 'Space')) return;   // let keyboard users press buttons
+    e.preventDefault(); submit(); return;
+  }
+  if (k === 'Backspace') { e.preventDefault(); del(); return; }
+  if (e.repeat) return;
+  const lk = k.toLowerCase();
+  if (lk === S.settings.dot) { e.preventDefault(); addSymbol('.'); }
+  else if (lk === S.settings.dash) { e.preventDefault(); addSymbol('-'); }
+});
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === 'dot') addSymbol('.');
+  else if (a === 'dash') addSymbol('-');
+  else if (a === 'del') del();
+  else if (a === 'enter') submit();
+  else if (a === 'play') { if (cur) playPattern(MORSE[cur]); }
+  else if (a === 'mode') setMode(el.dataset.mode);
+  else if (a === 'pad') padPress(el.dataset.ch);
+  else if (a === 'skill') { S.settings.skill = el.dataset.v; save(); last = null; nextRound(); }
+  else if (a.startsWith('c-')) copyAction(a, el.dataset);
+  else if (a === 'rebind') { rebinding = el.dataset.which; rebindNote = ''; renderSettings(); return; }
+  else if (a === 'reset') {
+    if (!resetArmed) {
+      resetArmed = true; renderSettings();
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => { resetArmed = false; renderSettings(); }, 4000);
+      return;
+    }
+    resetArmed = false;
+    const keep = S.settings;
+    S = defaults(); S.settings = keep;
+    store.del(KEY).then(save);
+    mode = 'learn'; last = null; renderSettings(); nextRound();
+    return;
+  }
+  if (el.blur) el.blur();   // keep Enter free for "check"
+});
+
+document.addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.speed) { playPattern(MORSE.K); return; }
+  const name = e.target.dataset && e.target.dataset.setting;
+  if (!name) return;
+  S.settings[name] = e.target.checked;
+  save();
+  if (name === 'numbers') { last = null; nextRound(); }
+  else if (name === 'keypad') renderStage();
+});
+
+/* ---------- listen mode ---------- */
+function listenStage(el) {
+  const read = kind === 'read';
+  const intro = phase === 'intro', shown = phase !== 'input';
+  const st = phase === 'right' ? ' right' : phase === 'wrong' ? ' wrong' : '';
+  el.className = 'stage' + st;
+  // Read: the morse pattern stays on the tape. Listen: the tape shows your answer.
+  const inside = (intro || read) ? marks(MORSE[cur])
+    : `<span class="heard">${typed}</span>${phase === 'input' ? '<span class="caret"></span>' : ''}`;
+  let under;
+  if (phase === 'wrong') {
+    under = `<div class="reveal"><span>You typed ${typed}. It was ${cur}:</span>${read ? '' : marks(MORSE[cur])}<span>${words(MORSE[cur])}</span></div>`;
+  } else if (intro) {
+    under = `<p class="note"><strong>New character.</strong> It is ${words(MORSE[cur])}. Play it a few times, then press ${EK()}.</p>`;
+  } else {
+    under = '<div class="reveal"></div>';
+  }
+  // Read shows what you typed in the big slot. Listen keeps the letter hidden until you answer.
+  const glyph = (read && phase === 'input') ? (typed || '?') : (shown ? cur : '?');
+  const ph = phase === 'input' && (!read || !typed);
+  const off = phase !== 'input' ? 'disabled' : '';
+  const enterLabel = intro ? 'Got it' : phase === 'wrong' ? 'Next letter' : 'Check';
+  const hint = intro ? ''
+    : padOn() ? (read ? 'Read the pattern, then tap the character it spells. Delete clears it, and Play again repeats the sound.'
+                      : 'Listen, then tap the character you heard. Delete clears it, and Play again repeats the sound.')
+    : (read ? `Read the pattern, then press the letter or number it spells. Backspace deletes. ${RK()} plays it again. ${EK()} checks your answer.`
+            : `Listen, then press the letter or number you heard. Backspace deletes. ${RK()} plays it again. ${EK()} checks your answer.`);
+  el.innerHTML = `
+    <div class="glyph${ph ? ' ph' : ''}" aria-label="${shown ? cur : read ? 'Read the morse and type the character' : 'Listen and type the character you hear'}">${glyph}</div>
+    <div class="tape${st}">${inside}</div>
+    ${under}
+    ${padOn() && !intro ? padHTML(phase !== 'input') : ''}
+    <div class="actions">
+      ${intro ? '' : `<button class="btn" data-action="del" ${off}>Delete</button>`}
+      <button class="btn" data-action="play">Play again</button>
+      <button class="btn primary" data-action="enter" ${phase === 'right' ? 'disabled' : ''}>${enterLabel}</button>
+    </div>
+    <p class="hint">${hint}</p>`;
+}
+function listenKey(e) {
+  const k = e.key, t = e.target;
+  if (isEnterKey(e)) {
+    if (kbFocus(t) && (e.code === 'Enter' || e.code === 'Space')) return;
+    e.preventDefault(); submit(); return;
+  }
+  if (k === 'Backspace') { e.preventDefault(); if (phase === 'input' && typed) { typed = ''; renderStage(); } return; }
+  if (e.code === S.settings.replay) { e.preventDefault(); if (cur && phase !== 'right') playPattern(MORSE[cur]); return; }
+  if (k === ' ') { e.preventDefault(); return; }
+  if (phase === 'input' && k.length === 1 && /[a-z0-9]/i.test(k)) { e.preventDefault(); typed = k.toUpperCase(); renderStage(); }
+}
+
+/* ---------- copy practice ---------- */
+const $ = id => document.getElementById(id);
+let copyView = 'setup';      // setup | run | result
+let run = null, copyResult = null;
+
+const fmt = sec => { sec = Math.ceil(sec); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
+const copyChars = () => copyPool().filter(c => !S.copy.off.includes(c));
+
+// Character speed sets how fast each letter sounds. Overall speed (Farnsworth) stretches the gaps.
+function timing(charWpm, effWpm) {
+  const u = 1.2 / charWpm;
+  if (effWpm >= charWpm) return { u, cg: 3 * u, wg: 7 * u };
+  const ta = (60 * charWpm - 37.2 * effWpm) / (charWpm * effWpm);
+  return { u, cg: 3 * ta / 19, wg: 7 * ta / 19 };
+}
+// Walks a block in seconds; calls cb(start, duration) for every beep. Returns total length.
+function walk(block, tm, cb) {
+  let t = 0;
+  for (let ci = 0; ci < block.length; ci++) {
+    const pat = MORSE[block[ci]];
+    for (let si = 0; si < pat.length; si++) {
+      const d = (pat[si] === '.' ? 1 : 3) * tm.u;
+      if (cb) cb(t, d);
+      t += d;
+      if (si < pat.length - 1) t += tm.u;
+    }
+    if (ci < block.length - 1) t += tm.cg;
+  }
+  return t;
+}
+function scheduleBlock(block, T, tm, dest) {
+  return T + walk(block, tm, (t, d) => beepAbs(T + t, d * 1000, dest));
+}
+function estimate() {
+  const cf = S.copy, sel = copyChars();
+  if (!sel.length) return 'Pick at least one character to send.';
+  const tm = timing(cf.charWpm, Math.min(cf.effWpm, cf.charWpm));
+  const avgU = sel.reduce((a, c) => a + MORSE[c].split('').reduce((x, s) => x + (s === '.' ? 1 : 3), 0) + MORSE[c].length - 1, 0) / sel.length;
+  const period = cf.size * avgU * tm.u + (cf.size - 1) * tm.cg + tm.wg;
+  const n = Math.max(1, Math.round(cf.minutes * 60 / period));
+  return `About ${n} blocks (${n * cf.size} characters) in ${cf.minutes} minute${cf.minutes > 1 ? 's' : ''} of sending.`;
+}
+
+function setupHTML() {
+  const cf = S.copy, p = copyPool();
+  const chips = p.map(c => `<button class="chip" data-action="c-toggle" data-ch="${c}" aria-pressed="${!cf.off.includes(c)}">${c}</button>`).join('');
+  const weakAny = p.some(c => missRate(c) > 0);
+  const seg = (action, items, isOn) => '<div class="seg">' + items.map(([v, label]) =>
+    `<button class="segbtn" data-action="${action}" data-v="${v}" aria-pressed="${isOn(v)}">${label}</button>`).join('') + '</div>';
+  return `
+    <h2 class="sec">Copy practice</h2>
+    <p class="sub">Listen to blocks of characters and type what you hear.</p>
+    <div class="sec" style="font-weight:700">Characters to send</div>
+    <div class="chips">${chips}</div>
+    <div class="minis">
+      <button class="btn small" data-action="c-all">All</button>
+      <button class="btn small" data-action="c-none">None</button>
+      <button class="btn small" data-action="c-weak" ${weakAny ? '' : 'disabled'}>Only my weak ones</button>
+    </div>
+    <div class="crow"><label class="lab" for="cs-size">Characters per block</label>
+      <input id="cs-size" type="range" min="1" max="10" step="1" value="${cf.size}" data-copy="size"><output id="cv-size"></output></div>
+    <div class="crow"><span class="lab">Length of sending</span>
+      ${seg('c-min', [[1, '1 min'], [2, '2 min'], [3, '3 min'], [5, '5 min'], [10, '10 min']], v => cf.minutes === +v)}<span></span></div>
+    <div class="crow"><label class="lab" for="cs-charWpm">Letter speed</label>
+      <input id="cs-charWpm" type="range" min="10" max="40" step="1" value="${cf.charWpm}" data-copy="charWpm"><output id="cv-charWpm"></output></div>
+    <div class="crow"><label class="lab" for="cs-effWpm">Overall speed</label>
+      <input id="cs-effWpm" type="range" min="5" max="${cf.charWpm}" step="1" value="${Math.min(cf.effWpm, cf.charWpm)}" data-copy="effWpm"><output id="cv-effWpm"></output></div>
+    <p class="sub" style="margin-top:-4px">Each letter sounds at the letter speed. Lower the overall speed to leave longer gaps between letters and blocks, which gives you time to write.</p>
+    <div class="crow"><span class="lab">How it is sent</span>
+      ${seg('c-deliv', [['cont', 'Keep sending'], ['paced', 'Wait for me after each block']], v => (v === 'paced') === cf.paced)}<span></span></div>
+    <p class="est" id="cEst"></p>
+    <div class="actions" style="justify-content:flex-start"><button class="btn primary" id="cStart" data-action="c-start">Start</button></div>`;
+}
+function syncCopyUI() {
+  const cf = S.copy;
+  if (cf.effWpm > cf.charWpm) cf.effWpm = cf.charWpm;
+  const set = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+  set('cv-size', cf.size);
+  set('cv-charWpm', cf.charWpm + ' wpm');
+  set('cv-effWpm', cf.effWpm + ' wpm');
+  const eff = $('cs-effWpm'); if (eff) { eff.max = cf.charWpm; eff.value = cf.effWpm; }
+  set('cEst', estimate());
+  const st = $('cStart'); if (st) st.disabled = !copyChars().length;
+}
+
+function runHTML() {
+  const r = run;
+  let actions;
+  if (r.paced) {
+    const w = r.state === 'wait', lastBlock = r.idx >= r.blocks.length - 1;
+    actions = `<button class="btn danger" data-action="c-stop">Stop</button>
+      <button class="btn" data-action="c-del">Delete</button>
+      <button class="btn" data-action="c-replay" ${w ? '' : 'disabled'}>Replay block</button>
+      <button class="btn primary" data-action="c-enter" ${w ? '' : 'disabled'}>${lastBlock ? 'Finish and score' : 'Next block'}</button>`;
+  } else {
+    actions = `<button class="btn danger" data-action="c-stop">Stop</button>
+      <button class="btn" data-action="c-del">Delete</button>
+      <button class="btn primary" data-action="c-enter" ${r.ended ? '' : 'disabled'}>Finish and score</button>`;
+  }
+  const hint = padOn()
+    ? (r.paced ? 'Tap each character you hear. Delete removes the last one. When the block ends, tap Next block.' : 'Tap the characters you hear as they play. Delete removes the last one. Tap Finish and score once sending ends.')
+    : r.paced
+    ? `Type each character you hear (A to Z, 0 to 9). Backspace deletes. When the block ends, press ${EK()} for the next one.`
+    : `Type what you hear as it plays. Backspace deletes. Spaces are optional and ignored when scoring. Press ${EK()} to finish once sending ends.`;
+  return `<div class="runbar"><div class="runfill" id="runFill"></div></div>
+    <p class="runinfo" id="runInfo"></p>
+    <div class="sheet"><div class="typed" id="typed"></div></div>
+    <p class="hint">${hint}</p>
+    ${padOn() ? padHTML(false) : ''}
+    <div class="actions" style="justify-content:flex-start">${actions}</div>`;
+}
+function renderTyped() {
+  const el = $('typed'); if (!el || !run) return;
+  let html;
+  if (run.paced) {
+    html = `<span class="g">${run.typed.split(' ').pop()}</span>`;
+  } else {
+    const chars = run.typed.replace(/ /g, '').split(''), size = run.cfg.size, groups = [];
+    for (let i = 0; i < chars.length; i += size) groups.push(chars.slice(i, i + size).join(''));
+    html = groups.map(g => `<span class="g">${g}</span>`).join('');
+  }
+  el.innerHTML = html + '<span class="caret"></span>';
+  el.parentElement.scrollTop = el.parentElement.scrollHeight;
+}
+function updateRunInfo() {
+  if (!run) return;
+  const info = $('runInfo'), fill = $('runFill'); if (!info || !fill) return;
+  const now = ac.currentTime, n = run.blocks.length;
+  if (run.paced) {
+    info.textContent = run.state === 'play' ? `Block ${run.idx + 1} of ${n}: listen...` : `Block ${run.idx + 1} of ${n}: type it, then press ${EK()}`;
+    fill.style.width = ((run.idx + (run.state === 'wait' ? 1 : 0)) / n * 100) + '%';
+  } else if (now < run.T0) {
+    info.textContent = 'Get ready...'; fill.style.width = '0%';
+  } else if (run.ended) {
+    info.textContent = `Sending finished. Finish your last characters, then press ${EK()}.`; fill.style.width = '100%';
+  } else {
+    info.textContent = 'Time left ' + fmt(run.endT - now);
+    fill.style.width = Math.min(100, (now - run.T0) / (run.endT - run.T0) * 100) + '%';
+  }
+}
+
+function resultHTML() {
+  const R = copyResult;
+  const nBlocks = Math.ceil(R.sentN / R.size);
+  const blocks = Array.from({ length: nBlocks }, () => []);
+  let si = 0;
+  R.ops.forEach(o => {
+    blocks[Math.min(Math.floor(si / R.size), nBlocks - 1)].push(o);
+    if (o.s) si++;
+  });
+  const cell = o => o.s
+    ? `<span class="cell ${o.s === o.t ? 'ok' : 'bad'}"><b>${o.s}</b><i>${o.t || '-'}</i></span>`
+    : `<span class="cell extra"><b>+</b><i>${o.t}</i></span>`;
+  const pct = R.sentN ? Math.round(R.ok / R.sentN * 100) : 0;
+  return `<h2 class="sec">Copy results</h2>
+    <p class="rsum"><strong>${R.ok} of ${R.sentN}</strong> characters copied correctly (${pct}%).</p>
+    <p class="sub">${R.top ? 'Most missed: ' + R.top + '. ' : 'No misses. '}${R.extra ? R.extra + ' extra character' + (R.extra > 1 ? 's' : '') + ' typed.' : ''}</p>
+    <div class="rgrid">${blocks.map(b => `<div class="rblock">${b.map(cell).join('')}</div>`).join('')}</div>
+    <p class="hint">Top row is what was sent. Bottom row is what you typed. A dash means you missed it, a plus means an extra character.</p>
+    <div class="actions" style="justify-content:flex-start;margin-top:18px">
+      <button class="btn primary" data-action="c-again">Practice again</button>
+      <button class="btn" data-action="c-setup">Change settings</button>
+    </div>`;
+}
+function renderCopy(el) {
+  el.className = 'stage copy';
+  if (copyView === 'run' && run) { el.innerHTML = runHTML(); renderTyped(); updateRunInfo(); }
+  else if (copyView === 'result' && copyResult) { el.innerHTML = resultHTML(); }
+  else { copyView = 'setup'; el.innerHTML = setupHTML(); syncCopyUI(); }
+}
+
+/* engine */
+function startCopy() {
+  const chars = copyChars(); if (!chars.length) return;
+  stopCopy();
+  const cf = S.copy, c = ctx(); if (!c) return;
+  const tm = timing(cf.charWpm, Math.min(cf.effWpm, cf.charWpm));
+  const blocks = []; let cum = 0;
+  while (cum < cf.minutes * 60) {
+    let b = '';
+    for (let i = 0; i < cf.size; i++) b += chars[Math.floor(Math.random() * chars.length)];
+    blocks.push(b); cum += walk(b, tm) + tm.wg;
+  }
+  const master = c.createGain(); master.connect(c.destination);
+  const T0 = c.currentTime + 1.5;
+  run = { cfg: Object.assign({}, cf), tm, blocks, typed: '', state: 'play', idx: 0, sched: 0, master, T0,
+          starts: [], endT: 0, ended: false, paced: !!cf.paced, timers: [], tick: null };
+  if (!run.paced) {
+    let t = T0;
+    blocks.forEach(b => { run.starts.push(t); t += walk(b, tm) + tm.wg; });
+    run.endT = t - tm.wg;
+  }
+  copyView = 'run'; copyResult = null;
+  run.tick = setInterval(tick, 200);
+  if (run.paced) playPaced(0, T0); else { tick(); renderAll(); }
+}
+function playPaced(i, when) {
+  const r = run, c = ac;
+  r.idx = i; r.state = 'play';
+  const end = scheduleBlock(r.blocks[i], Math.max(when, c.currentTime + 0.05), r.tm, r.master);
+  r.timers.push(setTimeout(() => { if (run === r) { r.state = 'wait'; renderStage(); } }, (end - c.currentTime) * 1000 + 60));
+  renderStage();
+}
+function tick() {
+  if (!run) return;
+  const now = ac.currentTime;
+  if (!run.paced) {
+    while (run.sched < run.blocks.length && run.starts[run.sched] < now + 3) {
+      scheduleBlock(run.blocks[run.sched], run.starts[run.sched], run.tm, run.master);
+      run.sched++;
+    }
+    if (!run.ended && now >= run.endT) { run.ended = true; renderStage(); return; }
+  }
+  updateRunInfo();
+}
+function stopCopy() {
+  if (!run) return;
+  clearInterval(run.tick);
+  run.timers.forEach(clearTimeout);
+  try { run.master.gain.value = 0; run.master.disconnect(); } catch (e) {}
+  run = null;
+}
+
+// Lines up what was typed with what was sent, so one missed letter doesn't spoil everything after it.
+function align(sent, typed) {
+  const n = sent.length, m = typed.length;
+  const d = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 0; i <= n; i++) d[i][0] = i;
+  for (let j = 0; j <= m; j++) d[0][j] = j;
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (sent[i - 1] === typed[j - 1] ? 0 : 1));
+  }
+  const ops = []; let i = n, j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && d[i][j] === d[i - 1][j - 1] + (sent[i - 1] === typed[j - 1] ? 0 : 1)) { ops.push({ s: sent[i - 1], t: typed[j - 1] }); i--; j--; }
+    else if (i > 0 && d[i][j] === d[i - 1][j] + 1) { ops.push({ s: sent[i - 1], t: '' }); i--; }
+    else { ops.push({ s: '', t: typed[j - 1] }); j--; }
+  }
+  return ops.reverse();
+}
+function finishCopy() {
+  const r = run;
+  const sent = r.blocks.join('').split(''), typed = r.typed.replace(/ /g, '').split('');
+  const size = r.cfg.size;
+  stopCopy();
+  const ops = align(sent, typed);
+  let ok = 0, extra = 0; const missed = {};
+  ops.forEach(o => {
+    if (!o.s) { extra++; return; }
+    const good = o.s === o.t;
+    if (good) ok++; else missed[o.s] = (missed[o.s] || 0) + 1;
+    bump(o.s, good);
+  });
+  save();
+  const top = Object.entries(missed).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([c, n]) => `${c} (${n})`).join(', ');
+  copyResult = { ops, size, sentN: sent.length, ok, extra, top };
+  copyView = 'result';
+  renderAll();
+}
+function copyEnter() {
+  if (copyView !== 'run') { startCopy(); return; }
+  if (!run) return;
+  if (run.paced) {
+    if (run.state !== 'wait') return;
+    if (run.idx >= run.blocks.length - 1) finishCopy();
+    else { run.typed += ' '; playPaced(run.idx + 1, ac.currentTime + 0.5); }
+  } else if (run.ended) finishCopy();
+}
+function copyDel() {
+  if (run && run.typed && run.typed.slice(-1) !== ' ') { run.typed = run.typed.slice(0, -1); renderTyped(); }
+}
+function padPress(ch) {
+  if (mode === 'copy') { if (copyView === 'run' && run) { run.typed += ch; renderTyped(); } return; }
+  if (isRecv() && phase === 'input') { typed = ch; renderStage(); }
+}
+function copyKey(e) {
+  const k = e.key;
+  if (copyView !== 'run' || !run) {
+    if (isEnterKey(e)) { e.preventDefault(); copyEnter(); }
+    return;
+  }
+  if (isEnterKey(e)) { e.preventDefault(); copyEnter(); return; }
+  if (e.code === S.settings.replay && run.paced) { e.preventDefault(); if (run.state === 'wait') playPaced(run.idx, ac.currentTime + 0.1); return; }
+  if (k === 'Backspace') { e.preventDefault(); copyDel(); return; }
+  if (k === ' ') {
+    e.preventDefault();
+    if (!run.paced && run.typed && run.typed.slice(-1) !== ' ') { run.typed += ' '; renderTyped(); }
+    return;
+  }
+  if (k.length === 1 && /[a-z0-9]/i.test(k)) { e.preventDefault(); run.typed += k.toUpperCase(); renderTyped(); }
+}
+function copyAction(a, d) {
+  const cf = S.copy;
+  if (a === 'c-toggle') { const i = cf.off.indexOf(d.ch); if (i >= 0) cf.off.splice(i, 1); else cf.off.push(d.ch); }
+  else if (a === 'c-all') cf.off = [];
+  else if (a === 'c-none') cf.off = copyPool().slice();
+  else if (a === 'c-weak') { const weak = copyPool().filter(c => missRate(c) > 0); if (weak.length) cf.off = copyPool().filter(c => !weak.includes(c)); }
+  else if (a === 'c-min') cf.minutes = +d.v;
+  else if (a === 'c-deliv') cf.paced = d.v === 'paced';
+  else if (a === 'c-start' || a === 'c-again') { startCopy(); return; }
+  else if (a === 'c-enter') { copyEnter(); return; }
+  else if (a === 'c-del') { copyDel(); return; }
+  else if (a === 'c-stop') { stopCopy(); copyView = 'setup'; }
+  else if (a === 'c-setup') { copyView = 'setup'; copyResult = null; }
+  else if (a === 'c-replay') { if (run && run.paced && run.state === 'wait') playPaced(run.idx, ac.currentTime + 0.1); return; }
+  save(); renderAll();
+}
+document.addEventListener('input', e => {
+  const sp = e.target.dataset && e.target.dataset.speed;
+  if (sp) { S.settings[sp] = +e.target.value; $('sv-listen').textContent = e.target.value + ' wpm'; save(); return; }
+  const n = e.target.dataset && e.target.dataset.copy;
+  if (!n) return;
+  S.copy[n] = +e.target.value;
+  syncCopyUI();
+  save();
+});
+
+/* ---------- start ---------- */
+(async function init() {
+  await load();
+  renderSettings();
+  nextRound();
+})();
+</script>
+</body>
+</html>
